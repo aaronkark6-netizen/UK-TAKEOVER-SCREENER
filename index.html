@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>UK Small/Mid-Cap Takeover Screen</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0A0C10; --surface:#12151B; --surface-2:#181C24;
+    --line:#242832; --line-strong:#33394A;
+    --ink:#E7E4DD; --ink-dim:#9096A3; --ink-mute:#5D6272;
+    --gold:#C6A15B; --gold-dim:#8A6F3D;
+    --clay:#B5533C; --clay-dim:#7C3A2A;
+    --green:#5C8F6E;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:'Inter',sans-serif;}
+  .wrap{max-width:1100px;margin:0 auto;padding:56px 32px 80px;}
+  .eyebrow{font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:2.5px;color:var(--gold);text-transform:uppercase;margin-bottom:14px;}
+  h1{font-family:'Fraunces',serif;font-weight:500;font-size:40px;line-height:1.1;margin:0 0 12px;color:var(--ink);}
+  .sub{color:var(--ink-dim);font-size:15px;line-height:1.6;max-width:640px;margin:0 0 40px;}
+  .panel{background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:24px 28px;margin-bottom:28px;}
+  .panel-title{font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:1.5px;color:var(--ink-mute);text-transform:uppercase;margin-bottom:18px;}
+  .weights{display:grid;grid-template-columns:repeat(5,1fr);gap:20px;}
+  .weight-item label{display:block;font-size:12px;color:var(--ink-dim);margin-bottom:8px;}
+  .weight-item .val{font-family:'IBM Plex Mono',monospace;color:var(--gold);font-weight:600;}
+  input[type=range]{width:100%;-webkit-appearance:none;height:3px;background:var(--line-strong);border-radius:2px;outline:none;}
+  input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;height:14px;border-radius:50%;background:var(--gold);cursor:pointer;border:2px solid var(--bg);}
+  input[type=range]::-moz-range-thumb{width:14px;height:14px;border-radius:50%;background:var(--gold);cursor:pointer;border:2px solid var(--bg);}
+  .weight-sum{margin-top:16px;font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--ink-mute);}
+  .weight-sum.warn{color:var(--clay);}
+  table{width:100%;border-collapse:collapse;}
+  thead th{text-align:left;font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:1px;text-transform:uppercase;color:var(--ink-mute);font-weight:500;padding:0 14px 12px;border-bottom:1px solid var(--line-strong);}
+  thead th.num{text-align:right;}
+  tbody td{padding:16px 14px;border-bottom:1px solid var(--line);font-size:14px;vertical-align:middle;}
+  tbody td.num{text-align:right;font-family:'IBM Plex Mono',monospace;color:var(--ink-dim);}
+  tbody tr{cursor:pointer;transition:background 0.15s;}
+  tbody tr:hover{background:var(--surface-2);}
+  tbody tr.active{background:var(--surface-2);}
+  .rank{font-family:'IBM Plex Mono',monospace;color:var(--ink-mute);font-size:13px;width:28px;}
+  .co{font-weight:500;color:var(--ink);}
+  .ticker{font-family:'IBM Plex Mono',monospace;color:var(--ink-mute);font-size:12px;margin-left:8px;}
+  .sector{font-size:12px;color:var(--ink-dim);}
+  .score-cell{display:flex;align-items:center;gap:10px;justify-content:flex-end;}
+  .score-num{font-family:'IBM Plex Mono',monospace;font-weight:600;font-size:16px;color:var(--gold);width:34px;text-align:right;}
+  .score-bar-track{width:70px;height:4px;background:var(--line-strong);border-radius:2px;overflow:hidden;}
+  .score-bar-fill{height:100%;background:var(--gold);border-radius:2px;}
+  .detail{background:var(--surface-2);border-left:2px solid var(--gold);margin:0 0 6px;padding:22px 26px;font-size:13px;}
+  .detail-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:18px;margin-bottom:18px;}
+  .factor-label{font-size:11px;color:var(--ink-mute);margin-bottom:6px;font-family:'IBM Plex Mono',monospace;letter-spacing:0.5px;}
+  .factor-track{height:6px;background:var(--line-strong);border-radius:3px;overflow:hidden;margin-bottom:6px;}
+  .factor-fill{height:100%;border-radius:3px;}
+  .factor-val{font-family:'IBM Plex Mono',monospace;font-size:13px;color:var(--ink);}
+  .note{color:var(--ink-dim);line-height:1.6;font-size:13px;padding-top:14px;border-top:1px solid var(--line);}
+  .note b{color:var(--ink);font-weight:500;}
+  .footer-note{margin-top:36px;padding-top:24px;border-top:1px solid var(--line);font-size:12px;color:var(--ink-mute);line-height:1.7;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="eyebrow">Proprietary screen — UK small / mid-cap</div>
+  <h1>Takeover likelihood model</h1>
+  <p class="sub">Ranks UK-listed small and mid-cap companies on a weighted composite of valuation discount, leverage headroom, ownership structure, margin quality and sector M&amp;A activity. Adjust the weights below to see the ranking respond.</p>
+
+  <div class="panel">
+    <div class="panel-title">Factor weights</div>
+    <div class="weights" id="weights"></div>
+    <div class="weight-sum" id="weightSum"></div>
+  </div>
+
+  <div class="panel" style="padding:20px 0 8px;">
+    <table>
+      <thead>
+        <tr>
+          <th style="padding-left:24px;">#</th>
+          <th>Company</th>
+          <th>Sector</th>
+          <th class="num" style="padding-right:24px;">Score</th>
+        </tr>
+      </thead>
+      <tbody id="tbody"></tbody>
+    </table>
+  </div>
+
+  <div class="footer-note">
+    Illustrative dataset built from public market commentary (AJ Bell, Saxo, MoneyWeek) as of mid-2026, using indicative rather than live-feed figures — a production version would connect to Bloomberg, FactSet or Capital IQ for real-time fundamentals and ownership data. Methodology and scoring logic are original.
+  </div>
+</div>
+
+<script>
+const factors = [
+  {key:'valuation', label:'Valuation discount', weight:25},
+  {key:'leverage', label:'Leverage headroom', weight:20},
+  {key:'ownership', label:'Ownership structure', weight:20},
+  {key:'margin', label:'Margin quality', weight:20},
+  {key:'mnaHeat', label:'Sector M&A heat', weight:15}
+];
+
+const companies = [
+  {
+    name:'Auction Technology Group', ticker:'ATG.L', sector:'Business Services',
+    evEbitda:11.5, sectorAvgEvEbitda:14, netDebtEbitda:1.2, freeFloat:78, ebitdaMargin:34, sectorAvgMargin:28, mnaHeat:97,
+    note:'Currently the subject of live, repeated approaches from FitzWalter Capital — the board has rejected eleven offers, making this the clearest active situation in the dataset.'
+  },
+  {
+    name:'Halfords Group', ticker:'HFD.L', sector:'Retail / Auto Services',
+    evEbitda:5.0, sectorAvgEvEbitda:8.5, netDebtEbitda:1.6, freeFloat:96, ebitdaMargin:6.2, sectorAvgMargin:6.0, mnaHeat:85,
+    note:'Trades on one of the cheapest EV/EBITDA multiples in UK retail. Previously rejected a take-private approach from Redde Northgate and remains a recurring subject of bid speculation.'
+  },
+  {
+    name:'Paragon Banking Group', ticker:'PAG.L', sector:'Financial Services',
+    evEbitda:6.8, sectorAvgEvEbitda:9.5, netDebtEbitda:2.0, freeFloat:99, ebitdaMargin:41, sectorAvgMargin:36, mnaHeat:72,
+    note:'Specialist lender trading at a discount within a UK banking and insurance sector widely flagged as being in active consolidation.'
+  },
+  {
+    name:'Phoenix Group Holdings', ticker:'PHNX.L', sector:'Insurance',
+    evEbitda:7.2, sectorAvgEvEbitda:10.0, netDebtEbitda:2.4, freeFloat:97, ebitdaMargin:38, sectorAvgMargin:35, mnaHeat:70,
+    note:'Life insurance consolidator trading below sector multiples, sitting inside a sub-sector where several peers have already seen bid interest.'
+  },
+  {
+    name:'Everplay Group', ticker:'EVPL.L', sector:'Gaming / Digital Media',
+    evEbitda:7.1, sectorAvgEvEbitda:11.5, netDebtEbitda:0.8, freeFloat:82, ebitdaMargin:22, sectorAvgMargin:19, mnaHeat:66,
+    note:'Trades at a marked discount to peers and precedent transactions despite resilient growth; management has flagged firepower for further consolidation, cutting both ways as acquirer or target.'
+  },
+  {
+    name:'Wickes Group', ticker:'WIX.L', sector:'Retail / DIY',
+    evEbitda:5.4, sectorAvgEvEbitda:7.8, netDebtEbitda:1.1, freeFloat:94, ebitdaMargin:7.5, sectorAvgMargin:7.0, mnaHeat:52,
+    note:'Low leverage and a clean balance sheet following its 2021 demerger from Travis Perkins, but limited recent M&A chatter in UK DIY retail.'
+  },
+  {
+    name:'Mears Group', ticker:'MER.L', sector:'Support Services',
+    evEbitda:6.5, sectorAvgEvEbitda:8.8, netDebtEbitda:1.4, freeFloat:88, ebitdaMargin:6.8, sectorAvgMargin:6.5, mnaHeat:48,
+    note:'Social housing and repairs contractor trading at a modest discount; fragmented ownership but limited live sector deal activity to point to.'
+  },
+  {
+    name:'Wood Group', ticker:'WG..L', sector:'Energy Services / Engineering',
+    evEbitda:4.6, sectorAvgEvEbitda:7.5, netDebtEbitda:2.8, freeFloat:99, ebitdaMargin:8.0, sectorAvgMargin:9.5, mnaHeat:60,
+    note:'Deeply discounted engineering services group with a prior approach from Sidara; higher leverage tempers appeal despite the cheap multiple.'
+  },
+  {
+    name:'DFS Furniture', ticker:'DFS.L', sector:'Retail / Furniture',
+    evEbitda:5.8, sectorAvgEvEbitda:8.0, netDebtEbitda:1.9, freeFloat:97, ebitdaMargin:7.2, sectorAvgMargin:7.4, mnaHeat:40,
+    note:'Persistently cheap on an absolute basis, but thin margins near the sector average and little live consolidation narrative in UK furniture retail.'
+  },
+  {
+    name:'Grafton Group', ticker:'GFTU.L', sector:'Building Materials',
+    evEbitda:7.6, sectorAvgEvEbitda:8.5, netDebtEbitda:0.6, freeFloat:98, ebitdaMargin:10.5, sectorAvgMargin:9.8, mnaHeat:45,
+    note:'Closest to fair value in the set — modest discount, very low leverage and above-average margins, but no immediate catalyst.'
+  }
+];
+
+function clamp(v){ return Math.max(0, Math.min(100, v)); }
+
+function computeFactorScores(c){
+  const valuation = clamp(50 + ((c.sectorAvgEvEbitda - c.evEbitda) / c.sectorAvgEvEbitda) * 150);
+  const leverage = clamp(100 - c.netDebtEbitda * 20);
+  const ownership = clamp(c.freeFloat);
+  const margin = clamp(50 + (c.ebitdaMargin - c.sectorAvgMargin) * 5);
+  const mnaHeat = clamp(c.mnaHeat);
+  return { valuation, leverage, ownership, margin, mnaHeat };
+}
+
+function weightedScore(fs, weights){
+  const total = weights.reduce((a,w)=>a+w.weight,0) || 1;
+  return (fs.valuation*weights[0].weight + fs.leverage*weights[1].weight + fs.ownership*weights[2].weight + fs.margin*weights[3].weight + fs.mnaHeat*weights[4].weight) / total;
+}
+
+let activeIndex = null;
+
+function renderWeights(){
+  const el = document.getElementById('weights');
+  el.innerHTML = factors.map((f,i)=>`
+    <div class="weight-item">
+      <label>${f.label} <span class="val" id="wval-${i}">${f.weight}%</span></label>
+      <input type="range" min="0" max="60" step="1" value="${f.weight}" data-idx="${i}" oninput="updateWeight(${i}, this.value)">
+    </div>
+  `).join('');
+  updateWeightSum();
+}
+
+function updateWeight(i, v){
+  factors[i].weight = parseInt(v);
+  document.getElementById('wval-'+i).textContent = v + '%';
+  updateWeightSum();
+  render();
+}
+
+function updateWeightSum(){
+  const sum = factors.reduce((a,f)=>a+f.weight,0);
+  const el = document.getElementById('weightSum');
+  el.textContent = `Weights sum to ${sum}% — scores are normalized against this total automatically.`;
+  el.className = 'weight-sum';
+}
+
+function render(){
+  const ranked = companies.map(c=>{
+    const fs = computeFactorScores(c);
+    const score = weightedScore(fs, factors);
+    return {...c, fs, score};
+  }).sort((a,b)=>b.score-a.score);
+
+  const tbody = document.getElementById('tbody');
+  tbody.innerHTML = ranked.map((c,i)=>{
+    const isActive = activeIndex === c.ticker;
+    let rows = `
+      <tr class="${isActive?'active':''}" onclick="toggleDetail('${c.ticker}')">
+        <td class="rank" style="padding-left:24px;">${i+1}</td>
+        <td>
+          <span class="co">${c.name}</span><span class="ticker">${c.ticker}</span>
+        </td>
+        <td class="sector">${c.sector}</td>
+        <td class="num" style="padding-right:24px;">
+          <div class="score-cell">
+            <div class="score-bar-track"><div class="score-bar-fill" style="width:${c.score.toFixed(0)}%"></div></div>
+            <div class="score-num">${c.score.toFixed(0)}</div>
+          </div>
+        </td>
+      </tr>
+    `;
+    if(isActive){
+      rows += `
+        <tr><td colspan="4" style="padding:0;border-bottom:none;">
+          <div class="detail">
+            <div class="detail-grid">
+              ${factorDetail('Valuation', c.fs.valuation, `${c.evEbitda}x EV/EBITDA vs ${c.sectorAvgEvEbitda}x sector avg`)}
+              ${factorDetail('Leverage', c.fs.leverage, `${c.netDebtEbitda}x net debt/EBITDA`)}
+              ${factorDetail('Ownership', c.fs.ownership, `${c.freeFloat}% free float`)}
+              ${factorDetail('Margin', c.fs.margin, `${c.ebitdaMargin}% EBITDA margin vs ${c.sectorAvgMargin}% sector`)}
+              ${factorDetail('M&A heat', c.fs.mnaHeat, `Sector deal activity signal`)}
+            </div>
+            <div class="note"><b>Why it ranks here — </b>${c.note}</div>
+          </div>
+        </td></tr>
+      `;
+    }
+    return rows;
+  }).join('');
+}
+
+function factorDetail(label, val, sub){
+  const color = val >= 70 ? 'var(--gold)' : val >= 45 ? 'var(--ink-dim)' : 'var(--clay)';
+  return `
+    <div>
+      <div class="factor-label">${label}</div>
+      <div class="factor-track"><div class="factor-fill" style="width:${val.toFixed(0)}%;background:${color}"></div></div>
+      <div class="factor-val">${val.toFixed(0)} <span style="color:var(--ink-mute);font-size:11px;">— ${sub}</span></div>
+    </div>
+  `;
+}
+
+function toggleDetail(ticker){
+  activeIndex = activeIndex === ticker ? null : ticker;
+  render();
+}
+
+renderWeights();
+render();
+</script>
+</body>
+</html>
