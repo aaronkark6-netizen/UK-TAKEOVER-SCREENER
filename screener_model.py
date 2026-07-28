@@ -12,7 +12,15 @@ Author: Aaron Kark
 import yfinance as yf
 import pandas as pd
 
-UNIVERSE = [
+# ---------------------------------------------------------------------------
+# 1. UNIVERSE DEFINITION
+# ---------------------------------------------------------------------------
+# In production this would be pulled dynamically (e.g. all FTSE Small Cap +
+# AIM constituents via an index membership feed). For this prototype the
+# universe is a fixed watchlist of UK small/mid-cap tickers.
+
+# Live candidates -- companies not currently the subject of an agreed deal.
+LIVE_UNIVERSE = [
     "ATG.L",   # Auction Technology Group
     "HFD.L",   # Halfords Group
     "PAG.L",   # Paragon Banking Group
@@ -22,8 +30,30 @@ UNIVERSE = [
     "WG..L",   # Wood Group
     "DFS.L",   # DFS Furniture
     "GFTU.L",  # Grafton Group
+    "EVPL.L",  # Everplay Group
+    "CRW.L",   # Craneware
+    "BRK.L",   # Brooks Macdonald Group
+    "NET.L",   # Netcall
+    "SWG.L",   # Shearwater Group
+    "FLK.L",   # Fletcher King
 ]
 
+# Validation cases -- companies already acquired or subject to an agreed
+# takeover during 2026. Used to backtest the scoring methodology against
+# real outcomes rather than only ranking still-open candidates.
+RESOLVED_UNIVERSE = [
+    "RCDO.L",  # Ricardo -- agreed £281m WSP offer, 69% premium
+    "AGR.L",   # Assura -- recommended KKR proposal, 38% premium
+    "GHH.L",   # Gooch & Housego -- acquired for £346m
+    "AMS.L",   # Advanced Medical Solutions Group -- agreed £659m H.B. Fuller bid
+    "RFX.L",   # Ramsdens Holdings -- acquired for £206m by FirstCash
+]
+
+UNIVERSE = LIVE_UNIVERSE + RESOLVED_UNIVERSE
+
+# Sector mapping used to compute peer-relative valuation and margin scores.
+# In production, sector peer sets would be pulled from a classification
+# feed (GICS/ICB) rather than hardcoded.
 SECTOR_MAP = {
     "ATG.L": "Business Services",
     "HFD.L": "Retail",
@@ -34,18 +64,44 @@ SECTOR_MAP = {
     "WG..L": "Energy Services",
     "DFS.L": "Retail",
     "GFTU.L": "Building Materials",
+    "EVPL.L": "Gaming / Digital Media",
+    "CRW.L": "Business Services",
+    "BRK.L": "Financial Services",
+    "NET.L": "Technology",
+    "SWG.L": "Technology",
+    "FLK.L": "Real Estate Services",
+    "RCDO.L": "Energy Services",
+    "AGR.L": "Real Estate",
+    "GHH.L": "Technology",
+    "AMS.L": "Healthcare",
+    "RFX.L": "Consumer Finance",
 }
 
+# Status of each ticker as of mid-2026 -- used to separate live candidates
+# from validation cases in reporting.
+STATUS_MAP = {t: "live" for t in LIVE_UNIVERSE}
+STATUS_MAP.update({
+    "RCDO.L": "agreed",
+    "AGR.L": "agreed",
+    "GHH.L": "completed",
+    "AMS.L": "agreed",
+    "RFX.L": "completed",
+})
+
+# ---------------------------------------------------------------------------
+# 2. FACTOR WEIGHTS
+# ---------------------------------------------------------------------------
 WEIGHTS = {
-    "valuation": 0.25,
-    "leverage": 0.20,
-    "ownership": 0.20,
-    "margin": 0.20,
-    "mna_heat": 0.15,
+    "valuation": 0.25,   # EV/EBITDA discount to sector average
+    "leverage": 0.20,    # Net Debt / EBITDA headroom
+    "ownership": 0.20,   # Free float as a proxy for ease of stake-building
+    "margin": 0.20,      # EBITDA margin vs sector average
+    "mna_heat": 0.15,    # Qualitative sector M&A activity signal (0-100)
 }
 
 
 def fetch_fundamentals(ticker: str) -> dict:
+    """Pull core fundamentals for a single ticker via yfinance."""
     t = yf.Ticker(ticker)
     info = t.info
 
@@ -77,6 +133,10 @@ def clamp(v: float, lo: float = 0, hi: float = 100) -> float:
 
 
 def score_universe(rows: list[dict], mna_heat_overrides: dict) -> pd.DataFrame:
+    """
+    Compute the five factor scores and the weighted composite for each
+    company, using sector-relative comparisons.
+    """
     df = pd.DataFrame(rows)
 
     sector_avg_ev_ebitda = df.groupby("sector")["ev_ebitda"].transform("mean")
@@ -108,12 +168,19 @@ def score_universe(rows: list[dict], mna_heat_overrides: dict) -> pd.DataFrame:
 
 
 if __name__ == "__main__":
+    # Qualitative sector M&A activity signal -- in production this would be
+    # derived systematically (e.g. count of announced deals in the sector
+    # over the trailing 12 months from a deals database), not assigned
+    # manually. Kept manual here for transparency in the prototype.
     mna_heat_overrides = {
         "ATG.L": 97, "HFD.L": 85, "PAG.L": 72, "PHNX.L": 70,
-        "WIX.L": 52, "MER.L": 48, "WG..L": 60, "DFS.L": 40, "GFTU.L": 45,
+        "WIX.L": 52, "MER.L": 48, "WG..L": 60, "DFS.L": 40, "GFTU.L": 45, "EVPL.L": 66,
+        "CRW.L": 92, "BRK.L": 74, "NET.L": 58, "SWG.L": 80, "FLK.L": 45,
+        "RCDO.L": 90, "AGR.L": 85, "GHH.L": 88, "AMS.L": 82, "RFX.L": 80,
     }
 
     rows = [fetch_fundamentals(t) for t in UNIVERSE]
     ranked = score_universe(rows, mna_heat_overrides)
 
-    print(ranked[["name", "ticker", "sector", "composite_score"]].to_string(index=False))
+    ranked["status"] = ranked["ticker"].map(STATUS_MAP)
+    print(ranked[["name", "ticker", "sector", "status", "composite_score"]].to_string(index=False))
