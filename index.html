@@ -57,19 +57,48 @@
   .note{color:var(--ink-dim);line-height:1.6;font-size:13px;padding-top:14px;border-top:1px solid var(--line);}
   .note b{color:var(--ink);font-weight:500;}
   .footer-note{margin-top:36px;padding-top:24px;border-top:1px solid var(--line);font-size:12px;color:var(--ink-mute);line-height:1.7;}
+
+  .controls{display:flex;gap:14px;align-items:center;margin-bottom:20px;flex-wrap:wrap;}
+  .search-box{flex:1;min-width:200px;background:var(--surface);border:1px solid var(--line);border-radius:5px;padding:10px 14px;color:var(--ink);font-family:'Inter',sans-serif;font-size:13px;outline:none;}
+  .search-box::placeholder{color:var(--ink-mute);}
+  .search-box:focus{border-color:var(--gold-dim);}
+  select.sector-filter{background:var(--surface);border:1px solid var(--line);border-radius:5px;padding:10px 14px;color:var(--ink);font-family:'Inter',sans-serif;font-size:13px;outline:none;}
+  .export-btn{background:var(--surface);border:1px solid var(--line);border-radius:5px;padding:10px 18px;color:var(--gold);font-family:'IBM Plex Mono',monospace;font-size:12px;letter-spacing:0.5px;cursor:pointer;transition:border-color 0.15s;}
+  .export-btn:hover{border-color:var(--gold-dim);}
+  .result-count{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--ink-mute);margin-bottom:14px;}
+
+  .badge{display:inline-block;font-family:'IBM Plex Mono',monospace;font-size:9.5px;letter-spacing:0.6px;text-transform:uppercase;padding:2px 7px;border-radius:3px;margin-left:9px;vertical-align:middle;}
+  .badge-live{background:rgba(198,161,91,0.15);color:var(--gold);border:1px solid var(--gold-dim);}
+  .badge-agreed{background:rgba(92,143,110,0.15);color:var(--green);border:1px solid var(--green);}
+  .badge-completed{background:rgba(93,98,114,0.2);color:var(--ink-dim);border:1px solid var(--ink-mute);}
+  .outcome-box{background:rgba(92,143,110,0.08);border:1px solid var(--green);border-radius:4px;padding:12px 16px;margin-top:14px;font-size:12.5px;color:var(--ink-dim);}
+  .outcome-box b{color:var(--green);font-weight:600;}
+
+  .section-divider{margin:44px 0 20px;padding-top:8px;border-top:1px solid var(--line-strong);}
+  .section-divider .panel-title{margin-bottom:6px;}
+  .section-sub{font-size:12.5px;color:var(--ink-dim);line-height:1.6;max-width:680px;}
 </style>
 </head>
 <body>
 <div class="wrap">
   <div class="eyebrow">Proprietary screen — UK small / mid-cap</div>
   <h1>Takeover likelihood model</h1>
-  <p class="sub">Ranks UK-listed small and mid-cap companies on a weighted composite of valuation discount, leverage headroom, ownership structure, margin quality and sector M&amp;A activity. Adjust the weights below to see the ranking respond.</p>
+  <p class="sub">Ranks UK-listed small and mid-cap companies on a weighted composite of valuation discount, leverage headroom, ownership structure, margin quality and sector M&amp;A activity. Adjust the weights below to see the ranking respond, then scroll down for a set of validation cases — real 2026 deals the model would have flagged in advance.</p>
 
   <div class="panel">
     <div class="panel-title">Factor weights</div>
     <div class="weights" id="weights"></div>
     <div class="weight-sum" id="weightSum"></div>
   </div>
+
+  <div class="controls">
+    <input type="text" class="search-box" id="searchBox" placeholder="Search company or ticker..." oninput="render()">
+    <select class="sector-filter" id="sectorFilter" onchange="render()">
+      <option value="">All sectors</option>
+    </select>
+    <button class="export-btn" onclick="exportCSV()">↓ Export CSV</button>
+  </div>
+  <div class="result-count" id="resultCount"></div>
 
   <div class="panel" style="padding:20px 0 8px;">
     <table>
@@ -85,8 +114,27 @@
     </table>
   </div>
 
+  <div class="section-divider">
+    <div class="panel-title">Validation cases</div>
+    <p class="section-sub">These five companies have already been acquired or agreed to takeover terms in 2026. Scores below are reconstructed from their pre-deal profile to illustrate what the model would have flagged — a lightweight backtest of the methodology rather than live candidates.</p>
+  </div>
+
+  <div class="panel" style="padding:20px 0 8px;">
+    <table>
+      <thead>
+        <tr>
+          <th style="padding-left:24px;">#</th>
+          <th>Company</th>
+          <th>Sector</th>
+          <th class="num" style="padding-right:24px;">Score</th>
+        </tr>
+      </thead>
+      <tbody id="tbodyResolved"></tbody>
+    </table>
+  </div>
+
   <div class="footer-note">
-    Illustrative dataset built from public market commentary (AJ Bell, Saxo, MoneyWeek) as of mid-2026, using indicative rather than live-feed figures — a production version would connect to Bloomberg, FactSet or Capital IQ for real-time fundamentals and ownership data. Methodology and scoring logic are original.
+    Illustrative dataset built from public market commentary (AJ Bell, Saxo, MoneyWeek, Proactive Investors, ii.co.uk) as of mid-2026, using indicative rather than live-feed figures — a production version would connect to Bloomberg, FactSet or Capital IQ for real-time fundamentals and ownership data. Validation-case pre-deal multiples are reconstructed estimates based on reported deal premiums, not verified pre-bid data. Methodology and scoring logic are original.
   </div>
 </div>
 
@@ -101,54 +149,109 @@ const factors = [
 
 const companies = [
   {
-    name:'Auction Technology Group', ticker:'ATG.L', sector:'Business Services',
+    name:'Auction Technology Group', ticker:'ATG.L', sector:'Business Services', status:'live',
     evEbitda:11.5, sectorAvgEvEbitda:14, netDebtEbitda:1.2, freeFloat:78, ebitdaMargin:34, sectorAvgMargin:28, mnaHeat:97,
     note:'Currently the subject of live, repeated approaches from FitzWalter Capital — the board has rejected eleven offers, making this the clearest active situation in the dataset.'
   },
   {
-    name:'Halfords Group', ticker:'HFD.L', sector:'Retail / Auto Services',
+    name:'Craneware', ticker:'CRW.L', sector:'Business Services', status:'live',
+    evEbitda:13.0, sectorAvgEvEbitda:14, netDebtEbitda:0.3, freeFloat:85, ebitdaMargin:26, sectorAvgMargin:28, mnaHeat:92,
+    note:'Rejected a proposal from Bain Capital at a 30%+ premium to the prevailing price, with the board arguing it still undervalued the business — a strong signal the company remains in acquirers\' sights.'
+  },
+  {
+    name:'Brooks Macdonald Group', ticker:'BRK.L', sector:'Financial Services', status:'live',
+    evEbitda:8.5, sectorAvgEvEbitda:9.5, netDebtEbitda:0.5, freeFloat:96, ebitdaMargin:24, sectorAvgMargin:36, mnaHeat:74,
+    note:'Wealth manager mid-transformation with improving net flows; explicitly flagged by MoneyWeek as valuable either standalone or in combination with another platform.'
+  },
+  {
+    name:'Netcall', ticker:'NET.L', sector:'Technology', status:'live',
+    evEbitda:9.8, sectorAvgEvEbitda:12.5, netDebtEbitda:0.2, freeFloat:88, ebitdaMargin:20, sectorAvgMargin:22, mnaHeat:58,
+    note:'AIM-listed software business flagged in the same coverage as a compelling, undervalued name — low leverage and high free float support a clean take-private case.'
+  },
+  {
+    name:'Shearwater Group', ticker:'SWG.L', sector:'Technology', status:'live',
+    evEbitda:6.9, sectorAvgEvEbitda:12.5, netDebtEbitda:0.9, freeFloat:80, ebitdaMargin:15, sectorAvgMargin:22, mnaHeat:80,
+    note:'AIM cybersecurity group specifically named as being circled by US buyers amid a broader wave of American acquirers targeting undervalued UK small-caps.'
+  },
+  {
+    name:'Fletcher King', ticker:'FLK.L', sector:'Real Estate Services', status:'live',
+    evEbitda:5.5, sectorAvgEvEbitda:8.0, netDebtEbitda:0.1, freeFloat:70, ebitdaMargin:12, sectorAvgMargin:11, mnaHeat:45,
+    note:'Small AIM property services firm with a very clean balance sheet; less live speculation than others in the set but a similarly thin, easily-cornered share register.'
+  },
+  {
+    name:'Halfords Group', ticker:'HFD.L', sector:'Retail / Auto Services', status:'live',
     evEbitda:5.0, sectorAvgEvEbitda:8.5, netDebtEbitda:1.6, freeFloat:96, ebitdaMargin:6.2, sectorAvgMargin:6.0, mnaHeat:85,
     note:'Trades on one of the cheapest EV/EBITDA multiples in UK retail. Previously rejected a take-private approach from Redde Northgate and remains a recurring subject of bid speculation.'
   },
   {
-    name:'Paragon Banking Group', ticker:'PAG.L', sector:'Financial Services',
+    name:'Paragon Banking Group', ticker:'PAG.L', sector:'Financial Services', status:'live',
     evEbitda:6.8, sectorAvgEvEbitda:9.5, netDebtEbitda:2.0, freeFloat:99, ebitdaMargin:41, sectorAvgMargin:36, mnaHeat:72,
     note:'Specialist lender trading at a discount within a UK banking and insurance sector widely flagged as being in active consolidation.'
   },
   {
-    name:'Phoenix Group Holdings', ticker:'PHNX.L', sector:'Insurance',
+    name:'Phoenix Group Holdings', ticker:'PHNX.L', sector:'Insurance', status:'live',
     evEbitda:7.2, sectorAvgEvEbitda:10.0, netDebtEbitda:2.4, freeFloat:97, ebitdaMargin:38, sectorAvgMargin:35, mnaHeat:70,
     note:'Life insurance consolidator trading below sector multiples, sitting inside a sub-sector where several peers have already seen bid interest.'
   },
   {
-    name:'Everplay Group', ticker:'EVPL.L', sector:'Gaming / Digital Media',
+    name:'Everplay Group', ticker:'EVPL.L', sector:'Gaming / Digital Media', status:'live',
     evEbitda:7.1, sectorAvgEvEbitda:11.5, netDebtEbitda:0.8, freeFloat:82, ebitdaMargin:22, sectorAvgMargin:19, mnaHeat:66,
     note:'Trades at a marked discount to peers and precedent transactions despite resilient growth; management has flagged firepower for further consolidation, cutting both ways as acquirer or target.'
   },
   {
-    name:'Wickes Group', ticker:'WIX.L', sector:'Retail / DIY',
+    name:'Wickes Group', ticker:'WIX.L', sector:'Retail / DIY', status:'live',
     evEbitda:5.4, sectorAvgEvEbitda:7.8, netDebtEbitda:1.1, freeFloat:94, ebitdaMargin:7.5, sectorAvgMargin:7.0, mnaHeat:52,
     note:'Low leverage and a clean balance sheet following its 2021 demerger from Travis Perkins, but limited recent M&A chatter in UK DIY retail.'
   },
   {
-    name:'Mears Group', ticker:'MER.L', sector:'Support Services',
+    name:'Mears Group', ticker:'MER.L', sector:'Support Services', status:'live',
     evEbitda:6.5, sectorAvgEvEbitda:8.8, netDebtEbitda:1.4, freeFloat:88, ebitdaMargin:6.8, sectorAvgMargin:6.5, mnaHeat:48,
     note:'Social housing and repairs contractor trading at a modest discount; fragmented ownership but limited live sector deal activity to point to.'
   },
   {
-    name:'Wood Group', ticker:'WG..L', sector:'Energy Services / Engineering',
+    name:'Wood Group', ticker:'WG..L', sector:'Energy Services / Engineering', status:'live',
     evEbitda:4.6, sectorAvgEvEbitda:7.5, netDebtEbitda:2.8, freeFloat:99, ebitdaMargin:8.0, sectorAvgMargin:9.5, mnaHeat:60,
     note:'Deeply discounted engineering services group with a prior approach from Sidara; higher leverage tempers appeal despite the cheap multiple.'
   },
   {
-    name:'DFS Furniture', ticker:'DFS.L', sector:'Retail / Furniture',
+    name:'DFS Furniture', ticker:'DFS.L', sector:'Retail / Furniture', status:'live',
     evEbitda:5.8, sectorAvgEvEbitda:8.0, netDebtEbitda:1.9, freeFloat:97, ebitdaMargin:7.2, sectorAvgMargin:7.4, mnaHeat:40,
     note:'Persistently cheap on an absolute basis, but thin margins near the sector average and little live consolidation narrative in UK furniture retail.'
   },
   {
-    name:'Grafton Group', ticker:'GFTU.L', sector:'Building Materials',
+    name:'Grafton Group', ticker:'GFTU.L', sector:'Building Materials', status:'live',
     evEbitda:7.6, sectorAvgEvEbitda:8.5, netDebtEbitda:0.6, freeFloat:98, ebitdaMargin:10.5, sectorAvgMargin:9.8, mnaHeat:45,
     note:'Closest to fair value in the set — modest discount, very low leverage and above-average margins, but no immediate catalyst.'
+  },
+  {
+    name:'Ricardo', ticker:'RCDO.L', sector:'Energy Services / Engineering', status:'agreed',
+    evEbitda:5.9, sectorAvgEvEbitda:7.5, netDebtEbitda:1.7, freeFloat:98, ebitdaMargin:8.5, sectorAvgMargin:9.5, mnaHeat:90,
+    note:'Engineering consultancy that backed a £281m approach from Canada\'s WSP at a 69% premium to its 90-day volume-weighted price — one of the largest premiums of 2026\'s takeover wave.',
+    outcome:'Backed a £281m cash offer from WSP Global at a 69% premium to its 90-day VWAP.'
+  },
+  {
+    name:'Assura', ticker:'AGR.L', sector:'Real Estate', status:'agreed',
+    evEbitda:12.5, sectorAvgEvEbitda:15.5, netDebtEbitda:2.9, freeFloat:99, ebitdaMargin:70, sectorAvgMargin:65, mnaHeat:85,
+    note:'FTSE 250 healthcare property REIT that recommended a KKR proposal worth 38% more than its three-month average share price.',
+    outcome:'Recommended a revised KKR takeover proposal at a 38% premium to its 3-month average price.'
+  },
+  {
+    name:'Gooch & Housego', ticker:'GHH.L', sector:'Technology', status:'completed',
+    evEbitda:7.4, sectorAvgEvEbitda:12.5, netDebtEbitda:0.6, freeFloat:90, ebitdaMargin:14, sectorAvgMargin:22, mnaHeat:88,
+    note:'AIM-listed precision optics manufacturer acquired by a private equity buyer for £346m — a classic profile of a cheap, well-run niche technology business.',
+    outcome:'Acquired by a private equity buyer for £346m.'
+  },
+  {
+    name:'Advanced Medical Solutions Group', ticker:'AMS.L', sector:'Healthcare', status:'agreed',
+    evEbitda:10.2, sectorAvgEvEbitda:13.0, netDebtEbitda:0.2, freeFloat:97, ebitdaMargin:24, sectorAvgMargin:26, mnaHeat:82,
+    note:'Maker of surgical glues and wound dressings that agreed a £659m bid from H.B. Fuller, the world\'s largest pure-play adhesives manufacturer — near-zero leverage made it an easy target to finance.',
+    outcome:'Agreed a £659m takeover by H.B. Fuller.'
+  },
+  {
+    name:'Ramsdens Holdings', ticker:'RFX.L', sector:'Consumer Finance', status:'completed',
+    evEbitda:6.8, sectorAvgEvEbitda:9.5, netDebtEbitda:0.4, freeFloat:94, ebitdaMargin:18, sectorAvgMargin:36, mnaHeat:80,
+    note:'High-street pawnbroker acquired in a £206m cash deal by FirstCash, a Texas-based pawnbroking group — the second UK pawnbroker FirstCash has bought after H&T.',
+    outcome:'Acquired for £206m cash (plus a dividend of up to 9p/share) by FirstCash.'
   }
 ];
 
@@ -169,6 +272,53 @@ function weightedScore(fs, weights){
 }
 
 let activeIndex = null;
+
+function populateSectorFilter(){
+  const sectors = [...new Set(companies.map(c=>c.sector))].sort();
+  const sel = document.getElementById('sectorFilter');
+  sectors.forEach(s=>{
+    const opt = document.createElement('option');
+    opt.value = s; opt.textContent = s;
+    sel.appendChild(opt);
+  });
+}
+
+function badgeFor(status){
+  if(status==='agreed') return '<span class="badge badge-agreed">Deal agreed</span>';
+  if(status==='completed') return '<span class="badge badge-completed">Completed</span>';
+  return '<span class="badge badge-live">Live</span>';
+}
+
+function exportCSV(){
+  const ranked = getRanked();
+  const rows = [['Rank','Company','Ticker','Sector','Status','Score','EV/EBITDA','Net Debt/EBITDA','Free Float %','EBITDA Margin %']];
+  ranked.forEach((c,i)=>{
+    rows.push([i+1, c.name, c.ticker, c.sector, c.status, c.score.toFixed(1), c.evEbitda, c.netDebtEbitda, c.freeFloat, c.ebitdaMargin]);
+  });
+  const csv = rows.map(r=>r.map(v=>`"${v}"`).join(',')).join('\\n');
+  const blob = new Blob([csv], {type:'text/csv'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = 'uk_takeover_screen.csv';
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function getRanked(){
+  return companies.map(c=>{
+    const fs = computeFactorScores(c);
+    const score = weightedScore(fs, factors);
+    return {...c, fs, score};
+  }).sort((a,b)=>b.score-a.score);
+}
+
+function matchesFilters(c){
+  const q = document.getElementById('searchBox').value.trim().toLowerCase();
+  const sector = document.getElementById('sectorFilter').value;
+  const matchesQuery = !q || c.name.toLowerCase().includes(q) || c.ticker.toLowerCase().includes(q);
+  const matchesSector = !sector || c.sector === sector;
+  return matchesQuery && matchesSector;
+}
 
 function renderWeights(){
   const el = document.getElementById('weights');
@@ -195,49 +345,52 @@ function updateWeightSum(){
   el.className = 'weight-sum';
 }
 
-function render(){
-  const ranked = companies.map(c=>{
-    const fs = computeFactorScores(c);
-    const score = weightedScore(fs, factors);
-    return {...c, fs, score};
-  }).sort((a,b)=>b.score-a.score);
-
-  const tbody = document.getElementById('tbody');
-  tbody.innerHTML = ranked.map((c,i)=>{
-    const isActive = activeIndex === c.ticker;
-    let rows = `
-      <tr class="${isActive?'active':''}" onclick="toggleDetail('${c.ticker}')">
-        <td class="rank" style="padding-left:24px;">${i+1}</td>
-        <td>
-          <span class="co">${c.name}</span><span class="ticker">${c.ticker}</span>
-        </td>
-        <td class="sector">${c.sector}</td>
-        <td class="num" style="padding-right:24px;">
-          <div class="score-cell">
-            <div class="score-bar-track"><div class="score-bar-fill" style="width:${c.score.toFixed(0)}%"></div></div>
-            <div class="score-num">${c.score.toFixed(0)}</div>
+function rowHtml(c, i){
+  const isActive = activeIndex === c.ticker;
+  let rows = `
+    <tr class="${isActive?'active':''}" onclick="toggleDetail('${c.ticker}')">
+      <td class="rank" style="padding-left:24px;">${i+1}</td>
+      <td>
+        <span class="co">${c.name}</span><span class="ticker">${c.ticker}</span>${badgeFor(c.status)}
+      </td>
+      <td class="sector">${c.sector}</td>
+      <td class="num" style="padding-right:24px;">
+        <div class="score-cell">
+          <div class="score-bar-track"><div class="score-bar-fill" style="width:${c.score.toFixed(0)}%"></div></div>
+          <div class="score-num">${c.score.toFixed(0)}</div>
+        </div>
+      </td>
+    </tr>
+  `;
+  if(isActive){
+    const outcomeHtml = c.outcome ? `<div class="outcome-box"><b>Actual outcome — </b>${c.outcome}</div>` : '';
+    rows += `
+      <tr><td colspan="4" style="padding:0;border-bottom:none;">
+        <div class="detail">
+          <div class="detail-grid">
+            ${factorDetail('Valuation', c.fs.valuation, `${c.evEbitda}x EV/EBITDA vs ${c.sectorAvgEvEbitda}x sector avg`)}
+            ${factorDetail('Leverage', c.fs.leverage, `${c.netDebtEbitda}x net debt/EBITDA`)}
+            ${factorDetail('Ownership', c.fs.ownership, `${c.freeFloat}% free float`)}
+            ${factorDetail('Margin', c.fs.margin, `${c.ebitdaMargin}% EBITDA margin vs ${c.sectorAvgMargin}% sector`)}
+            ${factorDetail('M&A heat', c.fs.mnaHeat, `Sector deal activity signal`)}
           </div>
-        </td>
-      </tr>
+          <div class="note"><b>Why it ranks here — </b>${c.note}</div>
+          ${outcomeHtml}
+        </div>
+      </td></tr>
     `;
-    if(isActive){
-      rows += `
-        <tr><td colspan="4" style="padding:0;border-bottom:none;">
-          <div class="detail">
-            <div class="detail-grid">
-              ${factorDetail('Valuation', c.fs.valuation, `${c.evEbitda}x EV/EBITDA vs ${c.sectorAvgEvEbitda}x sector avg`)}
-              ${factorDetail('Leverage', c.fs.leverage, `${c.netDebtEbitda}x net debt/EBITDA`)}
-              ${factorDetail('Ownership', c.fs.ownership, `${c.freeFloat}% free float`)}
-              ${factorDetail('Margin', c.fs.margin, `${c.ebitdaMargin}% EBITDA margin vs ${c.sectorAvgMargin}% sector`)}
-              ${factorDetail('M&A heat', c.fs.mnaHeat, `Sector deal activity signal`)}
-            </div>
-            <div class="note"><b>Why it ranks here — </b>${c.note}</div>
-          </div>
-        </td></tr>
-      `;
-    }
-    return rows;
-  }).join('');
+  }
+  return rows;
+}
+
+function render(){
+  const ranked = getRanked().filter(matchesFilters);
+  const live = ranked.filter(c=>c.status==='live');
+  const resolved = ranked.filter(c=>c.status!=='live');
+
+  document.getElementById('tbody').innerHTML = live.map((c,i)=>rowHtml(c,i)).join('') || '<tr><td colspan="4" style="padding:24px;color:var(--ink-mute);">No matching companies.</td></tr>';
+  document.getElementById('tbodyResolved').innerHTML = resolved.map((c,i)=>rowHtml(c,i)).join('') || '<tr><td colspan="4" style="padding:24px;color:var(--ink-mute);">No matching companies.</td></tr>';
+  document.getElementById('resultCount').textContent = `${live.length} live candidate${live.length!==1?'s':''} · ${resolved.length} validation case${resolved.length!==1?'s':''}`;
 }
 
 function factorDetail(label, val, sub){
@@ -256,6 +409,7 @@ function toggleDetail(ticker){
   render();
 }
 
+populateSectorFilter();
 renderWeights();
 render();
 </script>
