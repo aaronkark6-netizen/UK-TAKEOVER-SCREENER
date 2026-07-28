@@ -290,13 +290,13 @@ function badgeFor(status){
 }
 
 function exportCSV(){
-  const ranked = getRanked();
+  const ranked = getRanked().filter(matchesFilters);
   const rows = [['Rank','Company','Ticker','Sector','Status','Score','EV/EBITDA','Net Debt/EBITDA','Free Float %','EBITDA Margin %']];
   ranked.forEach((c,i)=>{
     rows.push([i+1, c.name, c.ticker, c.sector, c.status, c.score.toFixed(1), c.evEbitda, c.netDebtEbitda, c.freeFloat, c.ebitdaMargin]);
   });
-  const csv = rows.map(r=>r.map(v=>`"${v}"`).join(',')).join('\\n');
-  const blob = new Blob([csv], {type:'text/csv'});
+  const csv = rows.map(r=>r.map(v=>`"${String(v).replace(/"/g,'""')}"`).join(',')).join('\r\n');
+  const blob = new Blob(['\ufeff' + csv], {type:'text/csv;charset=utf-8;'});
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url; a.download = 'uk_takeover_screen.csv';
